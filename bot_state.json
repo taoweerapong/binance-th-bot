@@ -1,1 +1,18 @@
-{}
+{
+  "in_position": true,
+  "entry_price": 2643424.0,
+  "position_amount": 0.0,
+  "stop_loss": 2632035.0216347836,
+  "take_profit": 2662405.630608694,
+  "highest_since_entry": 2643424.0,
+  "entry_time": "2026-09-06T13:40:34.020658+00:00",
+  "wins": 0,
+  "losses": 0,
+  "consecutive_losses": 0,
+  "consecutive_wins": 0,
+  "risk_factor": 1.0,
+  "cooldown_left": 0,
+  "total_pnl": 0.0,
+  "history": [],
+  "last_run": "2026-09-06T13:40:34.020727+00:00"
+}
