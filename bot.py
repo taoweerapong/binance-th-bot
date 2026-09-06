@@ -1,0 +1,326 @@
+# -*- coding: utf-8 -*-
+"""
+bot.py — Adaptive Spot Bot สำหรับ Binance TH (REST ตรง /api/v1) รันบน GitHub Actions
+"""
+import os, json, time, hmac, hashlib, logging, traceback
+from urllib.parse import urlencode
+from datetime import datetime, timezone
+import requests
+
+# ================= CONFIG =================
+API_KEY    = os.getenv("BINANCE_TH_API_KEY", "")
+API_SECRET = os.getenv("BINANCE_TH_API_SECRET", "")
+BASE_URL   = "https://api.binance.th"
+
+SYMBOL     = os.getenv("SYMBOL", "BTCTHB")      # ไม่มี slash!
+AMOUNT     = float(os.getenv("AMOUNT", "500"))  # บาทต่อไม้
+INTERVAL   = os.getenv("INTERVAL", "1h")        # ให้ตรงกับ cron
+DRY_RUN    = os.getenv("DRY_RUN", "true").lower() == "true"
+
+EMA_FAST, EMA_SLOW, RSI_PERIOD, ATR_PERIOD = 10, 30, 14, 14
+RSI_BUY_MAX, RSI_EXIT = 70.0, 78.0
+ATR_SL_MULT, ATR_TP_MULT, TRAIL_ATR_MULT = 1.8, 3.0, 1.5
+MAX_CONSEC_LOSS, COOLDOWN_ROUNDS, MIN_RISK = 4, 6, 0.25
+MAX_ATR_PCT = 8.0
+
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(BASE_DIR, "bot_state.json")
+LOG_FILE   = os.path.join(BASE_DIR, "bot_log.txt")
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()])
+log = logging.getLogger("bot")
+
+# ================= STATE =================
+DEFAULT_STATE = {
+    "in_position": False, "entry_price": 0.0, "position_amount": 0.0,
+    "stop_loss": 0.0, "take_profit": 0.0, "highest_since_entry": 0.0,
+    "entry_time": None, "wins": 0, "losses": 0, "consecutive_losses": 0,
+    "consecutive_wins": 0, "risk_factor": 1.0, "cooldown_left": 0,
+    "total_pnl": 0.0, "history": [], "last_run": None,
+}
+
+def load_state():
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            data = json.load(f) or {}
+        s = dict(DEFAULT_STATE); s.update({k: v for k, v in data.items() if k in DEFAULT_STATE})
+        return s
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+        log.warning("อ่าน state ไม่ได้ (%s) -> เริ่มใหม่", e)
+        return dict(DEFAULT_STATE)
+
+def save_state(s):
+    s["last_run"] = datetime.now(timezone.utc).isoformat()
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(s, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, STATE_FILE)
+
+# ================= CLIENT =================
+class BinanceTH:
+    """REST client ตาม spec Binance TH — SIGNED ใช้ HMAC SHA256 + header X-MBX-APIKEY"""
+    def __init__(self, key, secret):
+        self.key, self.secret = key, secret
+        self.s = requests.Session()
+        self.s.headers.update({"X-MBX-APIKEY": key, "User-Agent": "gh-bot/1.0"})
+        self.offset = 0
+
+    def _sign(self, params):
+        q = urlencode(params, doseq=True)
+        sig = hmac.new(self.secret.encode(), q.encode(), hashlib.sha256).hexdigest()
+        return q + "&signature=" + sig
+
+    def _req(self, method, path, params=None, signed=False, retries=3):
+        params = dict(params or {})
+        for attempt in range(1, retries + 1):
+            try:
+                if signed:
+                    params["timestamp"] = int(time.time() * 1000) + self.offset
+                    params["recvWindow"] = 10000
+                    url = f"{BASE_URL}{path}?{self._sign(params)}"
+                    r = self.s.request(method, url, timeout=20)
+                else:
+                    r = self.s.request(method, BASE_URL + path, params=params, timeout=20)
+
+                if r.status_code == 429 or r.status_code == 418:
+                    wait = int(r.headers.get("Retry-After", 5 * attempt))
+                    log.warning("Rate limit %s -> รอ %ds", r.status_code, wait)
+                    time.sleep(wait); continue
+                if r.status_code >= 400:
+                    log.error("HTTP %s %s -> %s", r.status_code, path, r.text[:300])
+                    return None
+                return r.json()
+            except (requests.Timeout, requests.ConnectionError) as e:
+                log.warning("Network error (%d/%d): %s", attempt, retries, e)
+                time.sleep(2 * attempt)
+            except ValueError as e:
+                log.error("JSON ผิดรูปแบบ: %s", e); return None
+        log.error("ล้มเหลวครบ %d ครั้ง: %s", retries, path)
+        return None
+
+    def sync_time(self):
+        d = self._req("GET", "/api/v1/time")
+        if d and "serverTime" in d:
+            self.offset = int(d["serverTime"]) - int(time.time() * 1000)
+            log.info("Time offset = %d ms", self.offset)
+            return True
+        return False
+
+    def klines(self, symbol, interval, limit=200):
+        return self._req("GET", "/api/v1/klines",
+                         {"symbol": symbol, "interval": interval, "limit": limit})
+
+    def symbol_info(self, symbol):
+        d = self._req("GET", "/api/v1/exchangeInfo", {"symbol": symbol})
+        if not d: return None
+        syms = d.get("symbols") or []
+        for s in syms:
+            if s.get("symbol") == symbol: return s
+        return syms[0] if syms else None
+
+    def balance(self, asset):
+        d = self._req("GET", "/api/v1/account", signed=True)
+        if not d: return None
+        for b in d.get("balances", []):
+            if b.get("asset") == asset: return float(b.get("free", 0))
+        return 0.0
+
+    def market_order(self, symbol, side, quantity=None, quote_qty=None):
+        p = {"symbol": symbol, "side": side, "type": "MARKET"}
+        if quote_qty is not None: p["quoteOrderQty"] = quote_qty
+        else: p["quantity"] = quantity
+        return self._req("POST", "/api/v1/order", p, signed=True)
+
+# ================= INDICATORS =================
+def ema(v, n):
+    if len(v) < n: return []
+    k = 2 / (n + 1); out = [sum(v[:n]) / n]
+    for x in v[n:]: out.append(x * k + out[-1] * (1 - k))
+    return out
+
+def rsi(c, n=14):
+    if len(c) < n + 1: return None
+    g = [max(c[i] - c[i-1], 0) for i in range(1, len(c))]
+    l = [max(c[i-1] - c[i], 0) for i in range(1, len(c))]
+    ag, al = sum(g[:n]) / n, sum(l[:n]) / n
+    for i in range(n, len(g)):
+        ag = (ag * (n-1) + g[i]) / n; al = (al * (n-1) + l[i]) / n
+    return 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
+
+def atr(h, lo, c, n=14):
+    if len(c) < n + 1: return None
+    tr = [max(h[i]-lo[i], abs(h[i]-c[i-1]), abs(lo[i]-c[i-1])) for i in range(1, len(c))]
+    v = sum(tr[:n]) / n
+    for t in tr[n:]: v = (v * (n-1) + t) / n
+    return v
+
+# ================= HELPERS =================
+def step_round(qty, step):
+    if not step: return qty
+    prec = max(0, str(step).rstrip("0")[::-1].find(".")) if "." in str(step) else 0
+    return float(f"{(int(qty / step) * step):.{prec}f}")
+
+def get_filters(info):
+    f = {"step": 0.0, "min_qty": 0.0, "min_notional": 0.0}
+    for flt in (info or {}).get("filters", []):
+        t = flt.get("filterType")
+        if t == "LOT_SIZE":
+            f["step"] = float(flt.get("stepSize", 0)); f["min_qty"] = float(flt.get("minQty", 0))
+        elif t in ("MIN_NOTIONAL", "NOTIONAL"):
+            f["min_notional"] = float(flt.get("minNotional", 0))
+    return f
+
+def update_risk(s):
+    cl, cw = s["consecutive_losses"], s["consecutive_wins"]
+    rf = {0: min(1.0, s["risk_factor"] + 0.15 * cw), 1: 0.8, 2: 0.6}.get(cl, 0.4)
+    s["risk_factor"] = round(max(MIN_RISK, min(1.0, rf)), 3)
+    if cl >= MAX_CONSEC_LOSS and s["cooldown_left"] == 0:
+        s["cooldown_left"] = COOLDOWN_ROUNDS
+        log.warning("CIRCUIT BREAKER: แพ้ติด %d ไม้ -> พัก %d รอบ", cl, COOLDOWN_ROUNDS)
+
+def record_trade(s, entry, exit_p, qty, reason):
+    pnl = (exit_p - entry) * qty
+    pct = (exit_p / entry - 1) * 100 if entry else 0
+    won = pnl > 0
+    s["wins" if won else "losses"] += 1
+    if won: s["consecutive_wins"] += 1; s["consecutive_losses"] = 0
+    else:   s["consecutive_losses"] += 1; s["consecutive_wins"] = 0
+    s["total_pnl"] = round(s["total_pnl"] + pnl, 2)
+    s["history"] = (s["history"] + [{
+        "time": datetime.now(timezone.utc).isoformat(), "entry": entry,
+        "exit": exit_p, "qty": qty, "pnl": round(pnl, 2),
+        "pct": round(pct, 2), "reason": reason}])[-50:]
+    update_risk(s)
+    log.info("ปิดไม้ [%s] PnL=%.2f (%.2f%%) | W/L=%d/%d | risk=%.2f",
+             reason, pnl, pct, s["wins"], s["losses"], s["risk_factor"])
+
+# ================= MAIN =================
+def main():
+    log.info("=" * 60)
+    log.info("เริ่มรอบ | %s | TF=%s | DRY_RUN=%s", SYMBOL, INTERVAL, DRY_RUN)
+    s = load_state()
+
+    if not API_KEY or not API_SECRET:
+        if not DRY_RUN:
+            log.error("ไม่พบ API Key/Secret -> หยุด"); return
+        log.warning("ไม่มี key แต่ DRY_RUN=true -> รันเฉพาะข้อมูลสาธารณะ")
+
+    if s["cooldown_left"] > 0 and not s["in_position"]:
+        s["cooldown_left"] -= 1
+        log.warning("พักเทรด เหลือ %d รอบ", s["cooldown_left"])
+        save_state(s); return
+
+    api = BinanceTH(API_KEY, API_SECRET)
+    if API_KEY: api.sync_time()
+
+    info = api.symbol_info(SYMBOL)
+    if not info:
+        log.error("ดึง exchangeInfo ไม่ได้ -> ข้ามรอบ"); save_state(s); return
+    filt = get_filters(info)
+
+    raw = api.klines(SYMBOL, INTERVAL, 200)
+    if not raw or len(raw) < 50:
+        log.error("แท่งเทียนไม่พอ -> ข้ามรอบ"); save_state(s); return
+
+    raw = raw[:-1]                               # ตัดแท่งยังไม่ปิด กัน repaint
+    highs  = [float(k[2]) for k in raw]
+    lows   = [float(k[3]) for k in raw]
+    closes = [float(k[4]) for k in raw]
+    price  = closes[-1]
+
+    ef, es = ema(closes, EMA_FAST), ema(closes, EMA_SLOW)
+    r, a = rsi(closes, RSI_PERIOD), atr(highs, lows, closes, ATR_PERIOD)
+    if not ef or not es or r is None or not a:
+        log.error("คำนวณอินดิเคเตอร์ไม่ได้ -> ข้ามรอบ"); save_state(s); return
+
+    f_now, s_now, f_prev, s_prev = ef[-1], es[-1], ef[-2], es[-2]
+    atr_pct = a / price * 100
+    log.info("ราคา=%.2f | EMA%d=%.2f EMA%d=%.2f | RSI=%.1f | ATR=%.2f (%.2f%%) | risk=%.2f",
+             price, EMA_FAST, f_now, EMA_SLOW, s_now, r, a, atr_pct, s["risk_factor"])
+
+    golden = f_prev <= s_prev and f_now > s_now
+    death  = f_prev >= s_prev and f_now < s_now
+
+    # ---------- ถือของอยู่ ----------
+    if s["in_position"]:
+        entry, qty = s["entry_price"], s["position_amount"]
+        s["highest_since_entry"] = max(s["highest_since_entry"], price)
+        new_sl = s["highest_since_entry"] - a * TRAIL_ATR_MULT
+        if new_sl > s["stop_loss"]:
+            log.info("เลื่อน SL %.2f -> %.2f", s["stop_loss"], new_sl); s["stop_loss"] = new_sl
+
+        reason = ("STOP_LOSS"   if price <= s["stop_loss"]   else
+                  "TAKE_PROFIT" if price >= s["take_profit"] else
+                  "DEATH_CROSS" if death else
+                  "RSI_HIGH"    if r >= RSI_EXIT else None)
+
+        if reason:
+            q = step_round(qty, filt["step"])
+            if DRY_RUN:
+                log.info("[DRY] SELL %s qty=%.8f @ %.2f (%s)", SYMBOL, q, price, reason)
+                record_trade(s, entry, price, q, reason)
+            else:
+                free = api.balance(info.get("baseAsset", SYMBOL.replace("THB", "")))
+                if free is not None: q = step_round(min(q, free), filt["step"])
+                o = api.market_order(SYMBOL, "SELL", quantity=q)
+                if o:
+                    ex_p = float(o.get("cummulativeQuoteQty", 0)) / float(o.get("executedQty", 1) or 1) or price
+                    log.info("SELL สำเร็จ id=%s @ %.2f", o.get("orderId"), ex_p)
+                    record_trade(s, entry, ex_p, float(o.get("executedQty", q)), reason)
+                else:
+                    log.error("ส่งคำสั่งขายไม่สำเร็จ -> คงสถานะเดิม"); save_state(s); return
+            s.update({"in_position": False, "entry_price": 0.0, "position_amount": 0.0,
+                      "stop_loss": 0.0, "take_profit": 0.0, "highest_since_entry": 0.0,
+                      "entry_time": None})
+        else:
+            log.info("ถือต่อ | entry=%.2f SL=%.2f TP=%.2f | uPnL=%.2f",
+                     entry, s["stop_loss"], s["take_profit"], (price - entry) * qty)
+
+    # ---------- ยังไม่มีของ ----------
+    else:
+        uptrend = f_now > s_now
+        signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
+        cost = round(AMOUNT * s["risk_factor"], 2)
+        if not signal:
+            log.info("ไม่มีสัญญาณเข้า (golden=%s uptrend=%s RSI=%.1f)", golden, uptrend, r)
+        elif atr_pct > MAX_ATR_PCT:
+            log.warning("ผันผวนสูง ATR %.2f%% -> งดเข้า", atr_pct)
+        elif filt["min_notional"] and cost < filt["min_notional"]:
+            log.warning("มูลค่า %.2f < ขั้นต่ำ %.2f -> ข้าม", cost, filt["min_notional"])
+        else:
+            qty_est = step_round(cost / price, filt["step"])
+            if DRY_RUN:
+                log.info("[DRY] BUY %s %.2f THB @ %.2f (qty≈%.8f)", SYMBOL, cost, price, qty_est)
+                entry_p, got = price, qty_est
+            else:
+                o = api.market_order(SYMBOL, "BUY", quote_qty=cost)
+                if not o:  # บาง exchange ไม่รองรับ quoteOrderQty -> fallback
+                    log.warning("quoteOrderQty ไม่ผ่าน -> ลองใช้ quantity")
+                    o = api.market_order(SYMBOL, "BUY", quantity=qty_est)
+                if not o:
+                    log.error("ซื้อไม่สำเร็จ -> ข้ามรอบ"); save_state(s); return
+                got = float(o.get("executedQty", qty_est))
+                spent = float(o.get("cummulativeQuoteQty", cost))
+                entry_p = spent / got if got else price
+                log.info("BUY สำเร็จ id=%s qty=%.8f @ %.2f", o.get("orderId"), got, entry_p)
+            s.update({"in_position": True, "entry_price": entry_p, "position_amount": got,
+                      "stop_loss": entry_p - a * ATR_SL_MULT,
+                      "take_profit": entry_p + a * ATR_TP_MULT,
+                      "highest_since_entry": entry_p,
+                      "entry_time": datetime.now(timezone.utc).isoformat()})
+            log.info("เปิดไม้ | entry=%.2f SL=%.2f TP=%.2f", entry_p, s["stop_loss"], s["take_profit"])
+
+    save_state(s)
+    tot = s["wins"] + s["losses"]
+    log.info("สรุป: %d ไม้ | Winrate %.1f%% | PnL %.2f บาท",
+             tot, (s["wins"] / tot * 100 if tot else 0), s["total_pnl"])
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        log.critical("ผิดพลาดร้ายแรง: %s\n%s", e, traceback.format_exc())
+    finally:
+        log.info("จบรอบ\n")
