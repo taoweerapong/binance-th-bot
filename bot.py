@@ -6,6 +6,7 @@ import os, json, time, hmac, hashlib, logging, traceback
 from urllib.parse import urlencode
 from datetime import datetime, timezone
 import requests
+from decimal import Decimal
 
 # ================= CONFIG =================
 API_KEY    = os.getenv("BINANCE_TH_API_KEY", "")
@@ -158,9 +159,11 @@ def atr(h, lo, c, n=14):
 
 # ================= HELPERS =================
 def step_round(qty, step):
-    if not step: return qty
-    prec = max(0, str(step).rstrip("0")[::-1].find(".")) if "." in str(step) else 0
-    return float(f"{(int(qty / step) * step):.{prec}f}")
+    if not step or float(step) <= 0:
+        return float(qty)
+    q = Decimal(str(qty))
+    st = Decimal(str(step))
+    return float((q // st) * st)
 
 def get_filters(info):
     f = {"step": 0.0, "min_qty": 0.0, "min_notional": 0.0}
