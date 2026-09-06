@@ -44,4 +44,4 @@ jobs:
           git add bot_state.json bot_log.txt
           git diff --staged --quiet || git commit -m "state: $(date -u '+%Y-%m-%d %H:%M UTC')"
           git pull --rebase --autostash || true
-          git push
+          git push -f
