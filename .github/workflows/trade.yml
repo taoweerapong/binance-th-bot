@@ -37,20 +37,9 @@ jobs:
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
         run: python bot.py
 
-      - name: Commit state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git fetch origin main
-          git checkout main || git checkout -b main origin/main
-        
-          git add bot_state.json
-          
-          if ! git diff --cached --quiet; then
-            git commit -m "state: update bot state $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git pull --rebase origin main
-            git push origin main
-          else
-            echo "No changes in bot_state.json to commit."
-          fi
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-log
+          path: bot_log.txt
