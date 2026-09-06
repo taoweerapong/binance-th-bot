@@ -39,9 +39,21 @@ jobs:
 
       - name: Commit state
         run: |
-          git config user.name  "trading-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add bot_state.json bot_log.txt
-          git diff --staged --quiet || git commit -m "state: $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git pull --rebase --autostash || true
-          git push -f
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # ดึงโค้ดล่าสุดกลับมาและสลับเข้า branch main ให้แน่ใจ
+          git fetch origin main
+          git checkout main || git checkout -b main origin/main
+          
+          # เพิ่มเฉพาะไฟล์ state (ไม่ควรเพิ่ม bot_log.txt)
+          git add bot_state.json
+          
+          # ตรวจสอบว่ามีเปลี่ยนแปลงหรือไม่ ถ้ามีให้ commit และ push
+          if ! git diff --cached --quiet; then
+            git commit -m "state: update bot state $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin main
+            git push origin main
+          else
+            echo "No changes in bot_state.json to commit."
+          fi
