@@ -1,0 +1,47 @@
+name: Crypto Trading Bot
+
+on:
+  schedule:
+    - cron: '5 * * * *'      # ทุกชั่วโมง นาทีที่ 5 (UTC)
+  workflow_dispatch:          # ปุ่มกดรันเอง
+
+permissions:
+  contents: write             # ให้สิทธิ์ commit state กลับ repo
+
+concurrency:
+  group: trading-bot
+  cancel-in-progress: false   # กันรันซ้อนกัน
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          BINANCE_TH_API_KEY:    ${{ secrets.BINANCE_TH_API_KEY }}
+          BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_TH_API_SECRET }}
+          SYMBOL:   'BTCTHB'
+          AMOUNT:   '500'
+          INTERVAL: '1h'
+          DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
+        run: python bot.py
+
+      - name: Commit state
+        run: |
+          git config user.name  "trading-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add bot_state.json bot_log.txt
+          git diff --staged --quiet || git commit -m "state: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash || true
+          git push
