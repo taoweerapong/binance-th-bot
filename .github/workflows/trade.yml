@@ -37,9 +37,11 @@ jobs:
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
         run: python bot.py
 
-      - name: Upload Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bot-log
-          path: bot_log.txt
+      - name: Commit state
+        run: |
+          git config user.name  "trading-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add bot_state.json bot_log.txt
+          git diff --staged --quiet || git commit -m "state: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash || true
+          git push
