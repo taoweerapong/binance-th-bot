@@ -323,6 +323,12 @@ def main():
 
     # ---------- ยังไม่มีของ ----------
     else:
+        ok, why = is_worth_trading(price, take_profit, stop_loss)
+        if not ok:
+            log.info(f"ข้ามไม้นี้: {why}")
+            return
+        log.info(f"เข้าไม้ได้: {why}")
+
         uptrend = f_now > s_now
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
         cost = round(AMOUNT * s["risk_factor"], 2)
