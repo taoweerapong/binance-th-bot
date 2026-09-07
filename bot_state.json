@@ -1,16 +1,16 @@
 {
-  "in_position": true,
-  "entry_price": 2636322.0,
+  "in_position": false,
+  "entry_price": 0.0,
   "position_amount": 0.0,
-  "stop_loss": 2638404.729395744,
-  "take_profit": 2656210.964462244,
-  "highest_since_entry": 2649343.0,
-  "entry_time": "2026-09-06T18:20:32.294667+00:00",
+  "stop_loss": 0.0,
+  "take_profit": 0.0,
+  "highest_since_entry": 0.0,
+  "entry_time": null,
   "wins": 0,
-  "losses": 1,
-  "consecutive_losses": 1,
+  "losses": 2,
+  "consecutive_losses": 2,
   "consecutive_wins": 0,
-  "risk_factor": 0.8,
+  "risk_factor": 0.6,
   "cooldown_left": 0,
   "total_pnl": 0.0,
   "history": [
@@ -22,7 +22,16 @@
       "pnl": -0.0,
       "pct": -0.54,
       "reason": "STOP_LOSS"
+    },
+    {
+      "time": "2026-09-07T02:19:42.253991+00:00",
+      "entry": 2636322.0,
+      "exit": 2634919.0,
+      "qty": 0.0,
+      "pnl": -0.0,
+      "pct": -0.05,
+      "reason": "STOP_LOSS"
     }
   ],
-  "last_run": "2026-09-07T01:18:06.560497+00:00"
+  "last_run": "2026-09-07T02:19:42.254088+00:00"
 }
