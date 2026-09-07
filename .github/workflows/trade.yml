@@ -29,13 +29,14 @@ jobs:
 
       - name: Run bot
         env:
-          BINANCE_TH_API_KEY:    ${{ secrets.BINANCE_TH_API_KEY }}
-          BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_TH_API_SECRET }}
+          BINANCE_TH_API_KEY:    ${{ secrets.BINANCE_API_KEY }}
+          BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
           SYMBOL:   'BTCTHB'
           AMOUNT:   '500'
           INTERVAL: '1h'
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
         run: python bot.py
+
 
       - name: Commit state
         run: |
