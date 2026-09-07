@@ -40,21 +40,25 @@ jobs:
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
         run: python bot.py
 
-
       - name: Commit state
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add bot_log.txt bot_state.json
-          git diff --cached --quiet && { echo "ไม่มีอะไรเปลี่ยน"; exit 0; }
-          git commit -m "state: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          mkdir -p /tmp/state
+          cp -f bot_log.txt bot_state.json /tmp/state/ 2>/dev/null || true
 
-          for i in 1 2 3; do
+          for i in 1 2 3 4 5; do
             git fetch origin main
-            git rebase -X theirs origin/main || git rebase --abort
-            git push origin HEAD:main && exit 0
-            echo "push ชนกัน ลองใหม่..."
-            sleep 10
+            git checkout -B main origin/main
+            cp -f /tmp/state/bot_log.txt /tmp/state/bot_state.json . 2>/dev/null || true
+
+            git add bot_log.txt bot_state.json
+            git diff --cached --quiet && { echo "ไม่มีอะไรเปลี่ยน"; exit 0; }
+            git commit -m "state: $(date -u +'%Y-%m-%d %H:%M UTC')"
+
+            git push origin main && exit 0
+            echo "push ชนกัน ลองใหม่รอบที่ $i..."
+            sleep 8
           done
           exit 1
