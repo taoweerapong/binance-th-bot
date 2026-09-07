@@ -7,6 +7,50 @@ from urllib.parse import urlencode
 from datetime import datetime, timezone
 import requests
 
+# ══════════════════════════════════════════════
+#  ค่าธรรมเนียมและเกณฑ์ความคุ้มค่า
+# ══════════════════════════════════════════════
+FEE_RATE = float(os.getenv("FEE_RATE", "0.0025"))   # ค่าธรรมเนียมต่อข้าง (0.25%)
+ROUND_TRIP  = FEE_RATE * 2                           # เข้า+ออก = ต้นทุนต่อรอบ
+SLIPPAGE    = float(os.getenv("SLIPPAGE", "0.0005")) # ราคาคลาดเคลื่อน 0.05%
+TOTAL_COST  = ROUND_TRIP + SLIPPAGE * 2              # ต้นทุนจริงทั้งหมดต่อรอบ
+MIN_EDGE    = float(os.getenv("MIN_EDGE", "0.005"))  # กำไรสุทธิขั้นต่ำที่ยอมเข้าไม้ (0.5%)
+
+
+def net_pct(entry: float, exit_price: float) -> float:
+    """กำไร/ขาดทุนสุทธิเป็น % หลังหักค่าธรรมเนียมและ slippage ทั้ง 2 ข้าง"""
+    gross = (exit_price - entry) / entry
+    return (gross - TOTAL_COST) * 100
+
+
+def net_pnl(entry: float, exit_price: float, qty: float) -> float:
+    """กำไร/ขาดทุนสุทธิเป็นเงินบาทจริง"""
+    cost_in  = entry * qty * (1 + FEE_RATE + SLIPPAGE)
+    cash_out = exit_price * qty * (1 - FEE_RATE - SLIPPAGE)
+    return cash_out - cost_in
+
+
+def min_profitable_tp(entry: float) -> float:
+    """ราคา TP ต่ำสุดที่เข้าไม้แล้วคุ้มค่าธรรมเนียม"""
+    return entry * (1 + TOTAL_COST + MIN_EDGE)
+
+
+def is_worth_trading(entry: float, take_profit: float, stop_loss: float):
+    """เช็คก่อนเข้าไม้ว่าคุ้มหรือไม่ คืน (ผ่านไหม, เหตุผล)"""
+    min_tp = min_profitable_tp(entry)
+    if take_profit < min_tp:
+        return False, (f"TP {take_profit:,.0f} ต่ำกว่าจุดคุ้มทุน "
+                       f"{min_tp:,.0f} (ต้นทุนรอบละ {TOTAL_COST*100:.2f}%)")
+
+    net_win  = (take_profit - entry) / entry - TOTAL_COST
+    net_risk = (entry - stop_loss) / entry + TOTAL_COST
+    rr = net_win / net_risk if net_risk > 0 else 0
+
+    if rr < 1.5:
+        return False, f"R:R สุทธิ {rr:.2f} ต่ำเกินไป (ต้อง ≥ 1.5)"
+
+    return True, f"ผ่าน — R:R สุทธิ {rr:.2f}"
+    
 # ================= CONFIG =================
 API_KEY    = os.getenv("BINANCE_TH_API_KEY", "")
 API_SECRET = os.getenv("BINANCE_TH_API_SECRET", "")
@@ -181,20 +225,19 @@ def update_risk(s):
         log.warning("CIRCUIT BREAKER: แพ้ติด %d ไม้ -> พัก %d รอบ", cl, COOLDOWN_ROUNDS)
 
 def record_trade(s, entry, exit_p, qty, reason):
-    pnl = (exit_p - entry) * qty
-    pct = (exit_p / entry - 1) * 100 if entry else 0
-    won = pnl > 0
-    s["wins" if won else "losses"] += 1
-    if won: s["consecutive_wins"] += 1; s["consecutive_losses"] = 0
-    else:   s["consecutive_losses"] += 1; s["consecutive_wins"] = 0
-    s["total_pnl"] = round(s["total_pnl"] + pnl, 2)
-    s["history"] = (s["history"] + [{
-        "time": datetime.now(timezone.utc).isoformat(), "entry": entry,
-        "exit": exit_p, "qty": qty, "pnl": round(pnl, 2),
-        "pct": round(pct, 2), "reason": reason}])[-50:]
-    update_risk(s)
-    log.info("ปิดไม้ [%s] PnL=%.2f (%.2f%%) | W/L=%d/%d | risk=%.2f",
-             reason, pnl, pct, s["wins"], s["losses"], s["risk_factor"])
+    trade = {
+    "time":      datetime.now(timezone.utc).isoformat(),
+    "entry":     entry_price,
+    "exit":      exit_price,
+    "qty":       qty,
+    "pnl":       round(net_pnl(entry_price, exit_price, qty), 2),      # สุทธิ
+    "pct":       round(net_pct(entry_price, exit_price), 3),           # สุทธิ
+    "gross_pct": round((exit_price - entry_price) / entry_price * 100, 3),  # ก่อนหักค่าธรรมเนียม
+    "fee_pct":   round(TOTAL_COST * 100, 3),
+    "reason":    reason,
+}
+state["history"].append(trade)
+state["total_pnl"] = round(state["total_pnl"] + trade["pnl"], 2)
 
 # ================= MAIN =================
 def main():
