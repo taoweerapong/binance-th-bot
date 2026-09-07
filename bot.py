@@ -243,6 +243,9 @@ state["total_pnl"] = round(state["total_pnl"] + trade["pnl"], 2)
 def main():
     log.info("=" * 60)
     log.info("เริ่มรอบ | %s | TF=%s | DRY_RUN=%s", SYMBOL, INTERVAL, DRY_RUN)
+    log.info(f"ต้นทุนต่อรอบ: {TOTAL_COST*100:.2f}% "
+         f"(fee {ROUND_TRIP*100:.2f}% + slip {SLIPPAGE*2*100:.2f}%) | "
+         f"TP ขั้นต่ำต้อง +{(TOTAL_COST+MIN_EDGE)*100:.2f}%")
     s = load_state()
 
     if not API_KEY or not API_SECRET:
