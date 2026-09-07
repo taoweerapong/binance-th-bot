@@ -38,6 +38,9 @@ jobs:
           AMOUNT:   '500'
           INTERVAL: '1h'
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
+          FEE_RATE: '0.0025'    # ปรับตามอัตราจริงของคุณ
+          SLIPPAGE: '0.0005'
+          MIN_EDGE: '0.005'
         run: python bot.py
 
       - name: Commit state
