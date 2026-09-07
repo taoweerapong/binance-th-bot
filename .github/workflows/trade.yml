@@ -40,9 +40,18 @@ jobs:
 
       - name: Commit state
         run: |
-          git config user.name  "trading-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add bot_state.json bot_log.txt
-          git diff --staged --quiet || git commit -m "state: $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git pull --rebase --autostash || true
-          git push
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add bot_log.txt bot_state.json
+          git diff --cached --quiet && { echo "ไม่มีอะไรเปลี่ยน"; exit 0; }
+          git commit -m "state: $(date -u +'%Y-%m-%d %H:%M UTC')"
+
+          for i in 1 2 3; do
+            git fetch origin main
+            git rebase -X theirs origin/main || git rebase --abort
+            git push origin HEAD:main && exit 0
+            echo "push ชนกัน ลองใหม่..."
+            sleep 10
+          done
+          exit 1
