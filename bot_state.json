@@ -1,11 +1,11 @@
 {
-  "in_position": false,
-  "entry_price": 0.0,
+  "in_position": true,
+  "entry_price": 2603536.0,
   "position_amount": 0.0,
-  "stop_loss": 0.0,
-  "take_profit": 0.0,
-  "highest_since_entry": 0.0,
-  "entry_time": null,
+  "stop_loss": 2499805.532844629,
+  "take_profit": 2880150.579080989,
+  "highest_since_entry": 2603536.0,
+  "entry_time": "2026-09-08T05:50:59.768207+00:00",
   "wins": 0,
   "losses": 2,
   "consecutive_losses": 2,
@@ -33,5 +33,5 @@
       "reason": "STOP_LOSS"
     }
   ],
-  "last_run": "2026-09-08T05:19:38.447815+00:00"
+  "last_run": "2026-09-08T05:50:59.768324+00:00"
 }
