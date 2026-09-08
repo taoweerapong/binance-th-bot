@@ -1,8 +1,8 @@
 name: Crypto Trading Bot
 
 on:
-  schedule:
-    - cron: '5 * * * *'      # ทุกชั่วโมง นาทีที่ 5 (UTC)
+    schedule:
+    - cron: '10 1 * * *'
   workflow_dispatch:          # ปุ่มกดรันเอง
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
           BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
           SYMBOL:   'BTCTHB'
           AMOUNT:   '500'
-          INTERVAL: '1h'
+          INTERVAL: '1d'
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
           FEE_RATE: '0.0025'    # ปรับตามอัตราจริงของคุณ
           SLIPPAGE: '0.0005'
