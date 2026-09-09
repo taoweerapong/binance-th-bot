@@ -289,6 +289,13 @@ def main():
     log.info("ต้นทุนต่อรอบ: %.2f%% (fee %.2f%% + slip %.2f%%) | TP ขั้นต่ำต้อง +%.2f%%",
              TOTAL_COST * 100, ROUND_TRIP * 100, SLIPPAGE * 2 * 100,
              (TOTAL_COST + MIN_EDGE) * 100)
+    
+    regime, adx_val, ema200 = detect_regime(closes, highs, lows)
+    log.info("สภาวะตลาด: %s | ADX=%s | EMA200=%s",
+                 regime,
+                 f"{adx_val:.1f}" if adx_val else "N/A",
+                 f"{ema200:,.2f}" if ema200 else "N/A")
+
     s = load_state()
 
     if not API_KEY or not API_SECRET:
@@ -372,11 +379,6 @@ def main():
     # ---------- ยังไม่มีของ ----------
     else:
         uptrend = f_now > s_now
-        regime, adx_val, ema200 = detect_regime(closes, highs, lows)
-        log.info("สภาวะตลาด: %s | ADX=%s | EMA200=%s",
-                 regime,
-                 f"{adx_val:.1f}" if adx_val else "N/A",
-                 f"{ema200:,.2f}" if ema200 else "N/A")
 
         if regime == "BEAR":
             log.info("⛔ ขาลง (ราคาต่ำกว่า EMA200) → ถือเงินสด")
