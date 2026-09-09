@@ -293,3 +293,17 @@
 2026-09-09 04:21:41,829 | INFO    | สรุป: 2 ไม้ | Winrate 0.0% | PnL 0.00 บาท
 2026-09-09 04:21:41,829 | INFO    | จบรอบ
 
+2026-09-09 04:33:33,905 | INFO    | ============================================================
+2026-09-09 04:33:33,906 | INFO    | เริ่มรอบ | BTCTHB | TF=1d | DRY_RUN=True
+2026-09-09 04:33:33,906 | INFO    | ต้นทุนต่อรอบ: 0.60% (fee 0.50% + slip 0.10%) | TP ขั้นต่ำต้อง +1.10%
+2026-09-09 04:33:33,907 | CRITICAL | ผิดพลาดร้ายแรง: cannot access local variable 'closes' where it is not associated with a value
+Traceback (most recent call last):
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 445, in <module>
+    main()
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 293, in main
+    regime, adx_val, ema200 = detect_regime(closes, highs, lows)
+                                            ^^^^^^
+UnboundLocalError: cannot access local variable 'closes' where it is not associated with a value
+
+2026-09-09 04:33:33,907 | INFO    | จบรอบ
+
