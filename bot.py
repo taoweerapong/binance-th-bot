@@ -31,6 +31,11 @@ ATR_SL_MULT, ATR_TP_MULT, TRAIL_ATR_MULT = 1.0, 4.0, 1.5
 MAX_CONSEC_LOSS, COOLDOWN_ROUNDS, MIN_RISK = 4, 6, 0.25
 MAX_ATR_PCT = 8.0
 
+
+REGIME_EMA    = 200
+ADX_PERIOD    = 14
+ADX_TREND_MIN = 20.0
+
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "bot_state.json")
 LOG_FILE   = os.path.join(BASE_DIR, "bot_log.txt")
@@ -140,7 +145,7 @@ class BinanceTH:
             return True
         return False
 
-    def klines(self, symbol, interval, limit=200):
+    def klines(self, symbol, interval, limit=400):
         return self._req("GET", "/api/v1/klines",
                          {"symbol": symbol, "interval": interval, "limit": limit})
 
@@ -187,6 +192,47 @@ def atr(h, lo, c, n=14):
     v = sum(tr[:n]) / n
     for t in tr[n:]: v = (v * (n-1) + t) / n
     return v
+
+def adx(highs, lows, closes, period=ADX_PERIOD):
+    """ADX วัดความแรงเทรนด์ (ไม่สนทิศทาง) — <20 ไซด์เวย์, >25 เทรนด์ชัด"""
+    if len(closes) < period * 2 + 1:
+        return None
+    plus_dm, minus_dm, trs = [], [], []
+    for i in range(1, len(closes)):
+        up, dn = highs[i] - highs[i-1], lows[i-1] - lows[i]
+        plus_dm.append(up if (up > dn and up > 0) else 0.0)
+        minus_dm.append(dn if (dn > up and dn > 0) else 0.0)
+        trs.append(max(highs[i] - lows[i],
+                       abs(highs[i] - closes[i-1]),
+                       abs(lows[i] - closes[i-1])))
+
+    def smooth(x):
+        s = [sum(x[:period])]
+        for v in x[period:]:
+            s.append(s[-1] - s[-1] / period + v)
+        return s
+
+    str_, sp, sm = smooth(trs), smooth(plus_dm), smooth(minus_dm)
+    dxs = []
+    for i in range(len(str_)):
+        if str_[i] == 0:
+            continue
+        pdi, mdi = 100 * sp[i] / str_[i], 100 * sm[i] / str_[i]
+        if pdi + mdi > 0:
+            dxs.append(100 * abs(pdi - mdi) / (pdi + mdi))
+    return sum(dxs[-period:]) / period if len(dxs) >= period else None
+
+
+def detect_regime(closes, highs, lows):
+    """คืนค่า (regime, adx_value, ema200) — BULL / BEAR / SIDEWAYS / UNKNOWN"""
+    e200 = ema(closes, REGIME_EMA)
+    a = adx(highs, lows, closes)
+    if not e200 or a is None:
+        return "UNKNOWN", a, None
+    price, line = closes[-1], e200[-1]
+    if a < ADX_TREND_MIN:
+        return "SIDEWAYS", a, line
+    return ("BULL" if price > line else "BEAR"), a, line
 
 # ================= HELPERS =================
 def step_round(qty, step):
@@ -326,6 +372,21 @@ def main():
     # ---------- ยังไม่มีของ ----------
     else:
         uptrend = f_now > s_now
+        regime, adx_val, ema200 = detect_regime(closes, highs, lows)
+        log.info("สภาวะตลาด: %s | ADX=%s | EMA200=%s",
+                 regime,
+                 f"{adx_val:.1f}" if adx_val else "N/A",
+                 f"{ema200:,.2f}" if ema200 else "N/A")
+
+        if regime == "BEAR":
+            log.info("⛔ ขาลง (ราคาต่ำกว่า EMA200) → ถือเงินสด")
+            save_state(s); return
+        if regime == "SIDEWAYS":
+            log.info("⏸️ ไซด์เวย์ (ADX<%.0f) → รอเทรนด์ชัด", ADX_TREND_MIN)
+            save_state(s); return
+        if regime == "UNKNOWN":
+            log.info("❓ ข้อมูลไม่พอคำนวณ regime → ข้ามรอบนี้")
+            save_state(s); return
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
         cost = round(AMOUNT * s["risk_factor"], 2)
 
