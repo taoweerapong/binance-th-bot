@@ -290,12 +290,6 @@ def main():
              TOTAL_COST * 100, ROUND_TRIP * 100, SLIPPAGE * 2 * 100,
              (TOTAL_COST + MIN_EDGE) * 100)
     
-    regime, adx_val, ema200 = detect_regime(closes, highs, lows)
-    log.info("สภาวะตลาด: %s | ADX=%s | EMA200=%s",
-                 regime,
-                 f"{adx_val:.1f}" if adx_val else "N/A",
-                 f"{ema200:,.2f}" if ema200 else "N/A")
-
     s = load_state()
 
     if not API_KEY or not API_SECRET:
@@ -324,6 +318,13 @@ def main():
     highs  = [float(k[2]) for k in raw]
     lows   = [float(k[3]) for k in raw]
     closes = [float(k[4]) for k in raw]
+
+    regime, adx_val, ema200 = detect_regime(closes, highs, lows)
+    log.info("สภาวะตลาด: %s | ADX=%s | EMA200=%s",
+             regime,
+             f"{adx_val:.1f}" if adx_val else "N/A",
+             f"{ema200:,.2f}" if ema200 else "N/A")
+
     price  = closes[-1]
 
     ef, es = ema(closes, EMA_FAST), ema(closes, EMA_SLOW)
