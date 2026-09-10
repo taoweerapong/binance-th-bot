@@ -27,14 +27,14 @@ MIN_RR     = float(os.getenv("MIN_RR", "1.5"))
 
 EMA_FAST, EMA_SLOW, RSI_PERIOD, ATR_PERIOD = 10, 30, 14, 14
 RSI_BUY_MAX, RSI_EXIT = 70.0, 78.0
-ATR_SL_MULT, ATR_TP_MULT, TRAIL_ATR_MULT = 1.0, 4.0, 1.5
+ATR_SL_MULT, ATR_TP_MULT, TRAIL_ATR_MULT = 2.0, 8.0, 4.0
 MAX_CONSEC_LOSS, COOLDOWN_ROUNDS, MIN_RISK = 4, 6, 0.25
 MAX_ATR_PCT = 8.0
 
 
 REGIME_EMA    = 200
 ADX_PERIOD    = 14
-ADX_TREND_MIN = 20.0
+ADX_TREND_MIN = 0
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "bot_state.json")
