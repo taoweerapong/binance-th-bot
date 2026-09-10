@@ -310,7 +310,7 @@ def main():
         log.error("ดึง exchangeInfo ไม่ได้ -> ข้ามรอบ"); save_state(s); return
     filt = get_filters(info)
 
-    raw = api.klines(SYMBOL, INTERVAL, 200)
+    raw = api.klines(SYMBOL, INTERVAL, 400)
     if not raw or len(raw) < 50:
         log.error("แท่งเทียนไม่พอ -> ข้ามรอบ"); save_state(s); return
 
