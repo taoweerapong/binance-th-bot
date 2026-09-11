@@ -283,6 +283,61 @@ def record_trade(s, entry, exit_p, qty, reason):
              reason, pnl, pct, gross_pct, s["wins"], s["losses"], s["risk_factor"])
 
 # ================= MAIN =================
+# ============================================================
+# 🛡️ Kill Switch — หยุดเข้าไม้ใหม่เมื่อขาดทุนเกินกำหนด
+# ============================================================
+def kill_switch(s, price):
+    """คืน True = ห้ามเข้าไม้ใหม่ (ไม้เดิมยังดูแล SL/TP ต่อ)"""
+    if not KILL_ENABLED:
+        return False
+
+    if s.get("halted"):
+        log.error("⛔ KILL SWITCH ทำงานอยู่ | %s | หยุดเมื่อ %s",
+                  s.get("halt_reason", "-"), s.get("halt_time", "-"))
+        log.error("   ปลดล็อก: แก้ bot_state.json -> halted = false")
+        return True
+
+    realized = float(s.get("total_pnl", 0.0))
+    equity   = START_EQUITY + realized
+
+    if s.get("in_position") and price:
+        e = float(s.get("entry_price", 0) or 0)
+        q = float(s.get("position_amount", 0) or 0)
+        if e > 0 and q > 0:
+            equity += (price - e) * q
+
+    peak = max(float(s.get("peak_equity", START_EQUITY)), equity)
+    s["peak_equity"] = round(peak, 2)
+    dd = (peak - equity) / peak * 100 if peak > 0 else 0.0
+    s["dd_pct"] = round(dd, 2)
+
+    streak = int(s.get("consec_loss", s.get("loss_streak", 0)) or 0)
+
+    reason = None
+    if dd >= KILL_MAX_DD:
+        reason = f"Drawdown {dd:.2f}% >= {KILL_MAX_DD:.0f}%"
+    elif KILL_MAX_LOSS > 0 and realized <= -KILL_MAX_LOSS:
+        reason = f"ขาดทุนสะสม {realized:,.0f} บาท"
+    elif streak >= KILL_MAX_STREAK:
+        reason = f"แพ้ติดกัน {streak} ไม้"
+
+    if reason:
+        s["halted"]      = True
+        s["halt_reason"] = reason
+        s["halt_time"]   = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        log.error("=" * 52)
+        log.error("⛔ KILL SWITCH ทำงาน: %s", reason)
+        log.error("   Equity %s | Peak %s | DD %.2f%%",
+                  f"{equity:,.0f}", f"{peak:,.0f}", dd)
+        log.error("   หยุดเข้าไม้ใหม่ (ไม้เดิมยังดูแลต่อ)")
+        log.error("=" * 52)
+        return True
+
+    log.info("🛡️ Equity=%s | Peak=%s | DD=%.2f%% (ลิมิต %.0f%%) | แพ้ติด %d",
+             f"{equity:,.0f}", f"{peak:,.0f}", dd, KILL_MAX_DD, streak)
+    return False
+
+
 def main():
     log.info("=" * 60)
     log.info("เริ่มรอบ | %s | TF=%s | DRY_RUN=%s", SYMBOL, INTERVAL, DRY_RUN)
@@ -379,7 +434,9 @@ def main():
 
     # ---------- ยังไม่มีของ ----------
     else:
-            
+        if kill_switch(s, price):
+            save_state(s); return
+
         uptrend = f_now > s_now
 
         if ADX_TREND_MIN > 0 and regime == "BEAR":
