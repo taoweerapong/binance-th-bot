@@ -379,17 +379,19 @@ def main():
 
     # ---------- ยังไม่มีของ ----------
     else:
+            
         uptrend = f_now > s_now
 
-        if regime == "BEAR":
-            log.info("⛔ ขาลง (ราคาต่ำกว่า EMA200) → ถือเงินสด")
+        if ADX_TREND_MIN > 0 and regime == "BEAR":
+            log.info("🔴 ขาลง (ราคาต่ำกว่า EMA200) → ถือเงินสด")
             save_state(s); return
-        if regime == "SIDEWAYS":
-            log.info("⏸️ ไซด์เวย์ (ADX<%.0f) → รอเทรนด์ชัด", ADX_TREND_MIN)
+        if ADX_TREND_MIN > 0 and regime == "SIDEWAYS":
+            log.info("🔵 ไซด์เวย์ (ADX<%.0f) → รอเทรนด์ชัด", ADX_TREND_MIN)
             save_state(s); return
-        if regime == "UNKNOWN":
+        if ADX_TREND_MIN > 0 and regime == "UNKNOWN":
             log.info("❓ ข้อมูลไม่พอคำนวณ regime → ข้ามรอบนี้")
             save_state(s); return
+
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
         cost = round(AMOUNT * s["risk_factor"], 2)
 
