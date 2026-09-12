@@ -393,3 +393,24 @@ UnboundLocalError: cannot access local variable 'closes' where it is not associa
 2026-09-12 01:16:27,764 | INFO    | สรุป: 2 ไม้ | Winrate 0.0% | PnL 0.00 บาท
 2026-09-12 01:16:27,764 | INFO    | จบรอบ
 
+2026-09-12 04:49:34,103 | INFO    | ============================================================
+2026-09-12 04:49:34,103 | INFO    | เริ่มรอบ | BTCTHB | TF=1d | DRY_RUN=True
+2026-09-12 04:49:34,103 | INFO    | ต้นทุนต่อรอบ: 0.60% (fee 0.50% + slip 0.10%) | TP ขั้นต่ำต้อง +1.10%
+2026-09-12 04:49:34,103 | WARNING | อ่าน state ไม่ได้ (Expecting value: line 2 column 1 (char 1)) -> เริ่มใหม่
+2026-09-12 04:49:34,792 | INFO    | Time offset = -55 ms
+2026-09-12 04:49:35,455 | INFO    | สภาวะตลาด: BULL | ADX=56.8 | EMA200=2,416,477.84
+2026-09-12 04:49:35,455 | INFO    | ราคา=2552557.00 | EMA10=2577990.93 EMA30=2486947.94 | RSI=55.9 | ATR=70540.45 (2.76%) | risk=1.00
+2026-09-12 04:49:35,458 | CRITICAL | ผิดพลาดร้ายแรง: name 'KILL_ENABLED' is not defined
+Traceback (most recent call last):
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 510, in <module>
+    main()
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 437, in main
+    if kill_switch(s, price):
+       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 291, in kill_switch
+    if not KILL_ENABLED:
+           ^^^^^^^^^^^^
+NameError: name 'KILL_ENABLED' is not defined
+
+2026-09-12 04:49:35,458 | INFO    | จบรอบ
+
