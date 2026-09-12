@@ -450,7 +450,8 @@ def main():
             save_state(s); return
 
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
-        cost = round(AMOUNT * s["risk_factor"], 2)
+        equity = START_EQUITY + float(s.get("total_pnl", 0.0))
+        cost   = round(equity * 0.95 * s["risk_factor"], 2)
 
         plan_sl = price - a * ATR_SL_MULT
         plan_tp = price + a * ATR_TP_MULT
@@ -473,6 +474,10 @@ def main():
             log.info("เข้าไม้ได้: %s", why)
 
             qty_est = step_round(cost / price, filt["step"])
+            if qty_est <= 0:
+                log.error("❌ qty=0 (cost=%.2f / price=%.2f) -> ข้ามรอบ", cost, price)
+                save_state(s); return
+
             if DRY_RUN:
                 log.info("[DRY] BUY %s %.2f THB @ %.2f (qty≈%.8f)", SYMBOL, cost, price, qty_est)
                 entry_p, got = price, qty_est
