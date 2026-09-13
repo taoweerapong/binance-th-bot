@@ -17,6 +17,15 @@ AMOUNT     = float(os.getenv("AMOUNT", "500"))
 INTERVAL   = os.getenv("INTERVAL", "1h")
 DRY_RUN    = os.getenv("DRY_RUN", "true").lower() == "true"
 
+
+# ---------- ทุนจำลอง & Kill Switch ----------
+START_EQUITY    = float(os.getenv("START_EQUITY", "100000"))
+KILL_ENABLED    = os.getenv("KILL_ENABLED", "1") == "1"
+KILL_MAX_DD     = float(os.getenv("KILL_MAX_DD", "20"))
+KILL_MAX_LOSS   = float(os.getenv("KILL_MAX_LOSS", "5"))
+KILL_MAX_STREAK = int(os.getenv("KILL_MAX_STREAK", "5"))
+
+
 # ---------- ค่าธรรมเนียม (ขั้นที่ 1) ----------
 FEE_RATE   = float(os.getenv("FEE_RATE", "0.0025"))
 SLIPPAGE   = float(os.getenv("SLIPPAGE", "0.0005"))
