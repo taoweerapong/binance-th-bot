@@ -456,3 +456,24 @@ NameError: name 'KILL_ENABLED' is not defined
 
 2026-09-13 01:16:36,479 | INFO    | จบรอบ
 
+2026-09-13 16:33:14,637 | INFO    | ============================================================
+2026-09-13 16:33:14,637 | INFO    | เริ่มรอบ | BTCTHB | TF=1d | DRY_RUN=True
+2026-09-13 16:33:14,637 | INFO    | ต้นทุนต่อรอบ: 0.60% (fee 0.50% + slip 0.10%) | TP ขั้นต่ำต้อง +1.10%
+2026-09-13 16:33:14,637 | WARNING | อ่าน state ไม่ได้ (Expecting value: line 2 column 1 (char 1)) -> เริ่มใหม่
+2026-09-13 16:33:15,282 | INFO    | Time offset = -57 ms
+2026-09-13 16:33:16,113 | INFO    | สภาวะตลาด: BULL | ADX=55.1 | EMA200=2,418,167.28
+2026-09-13 16:33:16,114 | INFO    | ราคา=2556736.00 | EMA10=2574126.40 EMA30=2491450.39 | RSI=56.3 | ATR=66543.13 (2.60%) | risk=1.00
+2026-09-13 16:33:16,116 | CRITICAL | ผิดพลาดร้ายแรง: name 'KILL_ENABLED' is not defined
+Traceback (most recent call last):
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 510, in <module>
+    main()
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 437, in main
+    if kill_switch(s, price):
+       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/binance-th-bot/binance-th-bot/bot.py", line 291, in kill_switch
+    if not KILL_ENABLED:
+           ^^^^^^^^^^^^
+NameError: name 'KILL_ENABLED' is not defined
+
+2026-09-13 16:33:16,117 | INFO    | จบรอบ
+
