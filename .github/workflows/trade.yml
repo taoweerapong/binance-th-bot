@@ -2,7 +2,7 @@ name: Crypto Trading Bot
 
 on:
   schedule:
-    - cron: '10 1 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:          # ปุ่มกดรันเอง
 
 permissions:
