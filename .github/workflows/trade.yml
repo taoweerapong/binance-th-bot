@@ -36,7 +36,7 @@ jobs:
           BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
           SYMBOL:   'BTCTHB'
           AMOUNT:   '500'
-          INTERVAL: '15m'
+          INTERVAL: '5m'
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
           FEE_RATE: '0.0025'    # ปรับตามอัตราจริงของคุณ
           SLIPPAGE: '0.0005'
