@@ -2,7 +2,7 @@ name: Crypto Trading Bot
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:          # ปุ่มกดรันเอง
 
 permissions:
@@ -36,11 +36,12 @@ jobs:
           BINANCE_TH_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
           SYMBOL:   'BTCTHB'
           AMOUNT:   '500'
-          INTERVAL: '5m'
+          INTERVAL: '1h'
           DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
           FEE_RATE: '0.0025'    # ปรับตามอัตราจริงของคุณ
           SLIPPAGE: '0.0005'
           MIN_EDGE: '0.005'
+          FORCE_ENTRY: '1'
           ADX_TREND_MIN: '0'
           RSI_BUY_MAX: '80'
         run: python bot.py
