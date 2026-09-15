@@ -485,8 +485,9 @@ def main():
                 return
             log.info("เข้าไม้ได้: %s", why)
             
-            log.info("🔍 DEBUG step=%s filt=%s", filt.get("step"), filt)
-            qty_est = step_round(cost / price, filt["step"])
+    qty_val = cost / price
+    # ใช้ทศนิยม 5 ตำแหน่ง (ตาม step 0.00001) และปัดลงเพื่อให้ไม่เกินยอดเงิน
+    qty_est = float(f"{qty_val:.5f}")
             if qty_est <= 0:
                 log.error("❌ qty=0 (cost=%.2f / price=%.2f) -> ข้ามรอบ", cost, price)
                 save_state(s); return
