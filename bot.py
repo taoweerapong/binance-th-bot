@@ -484,7 +484,8 @@ def main():
                          tot, (s["wins"] / tot * 100 if tot else 0), s["total_pnl"])
                 return
             log.info("เข้าไม้ได้: %s", why)
-
+            
+            log.info("🔍 DEBUG step=%s filt=%s", filt.get("step"), filt)
             qty_est = step_round(cost / price, filt["step"])
             if qty_est <= 0:
                 log.error("❌ qty=0 (cost=%.2f / price=%.2f) -> ข้ามรอบ", cost, price)
