@@ -44,6 +44,7 @@ MAX_ATR_PCT = 8.0
 REGIME_EMA    = 200
 ADX_PERIOD    = 14
 ADX_TREND_MIN = 0
+FORCE_ENTRY = os.getenv("FORCE_ENTRY", "0") == "1"
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "bot_state.json")
@@ -459,6 +460,8 @@ def main():
             save_state(s); return
 
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
+        if FORCE_ENTRY:
+        signal = True
         equity = START_EQUITY + float(s.get("total_pnl", 0.0))
         cost   = round(equity * 0.95 * s["risk_factor"], 2)
 
