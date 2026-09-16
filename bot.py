@@ -460,8 +460,6 @@ def main():
             save_state(s); return
 
         signal = (golden or (uptrend and price > f_now)) and r < RSI_BUY_MAX
-        if FORCE_ENTRY:
-            signal = True
         equity = START_EQUITY + float(s.get("total_pnl", 0.0))
         cost   = round(equity * 0.95 * s["risk_factor"], 2)
 
