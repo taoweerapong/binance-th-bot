@@ -419,13 +419,13 @@ def main():
                   "RSI_HIGH"    if r >= RSI_EXIT else None)
 
         if reason:
-            q = step_round(qty, filt["step"])
+            q = float(f"{qty:.5f}")
             if DRY_RUN:
                 log.info("[DRY] SELL %s qty=%.8f @ %.2f (%s)", SYMBOL, q, price, reason)
                 record_trade(s, entry, price, q, reason)
             else:
                 free = api.balance(info.get("baseAsset", SYMBOL.replace("THB", "")))
-                if free is not None: q = step_round(min(q, free), filt["step"])
+                if free is not None: q = float(f"{min(q, free):.5f}")
                 o = api.market_order(SYMBOL, "SELL", quantity=q)
                 if o:
                     ex_p = float(o.get("cummulativeQuoteQty", 0)) / float(o.get("executedQty", 1) or 1) or price
