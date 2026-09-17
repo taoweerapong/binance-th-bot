@@ -37,7 +37,7 @@ jobs:
           SYMBOL:   'BTCTHB'
           AMOUNT:   '500'
           INTERVAL: '1d'
-          DRY_RUN:  'false'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
+          DRY_RUN:  'true'      # เปลี่ยนเป็น 'false' เมื่อพร้อมเทรดจริง
           FEE_RATE: '0.0025'    # ปรับตามอัตราจริงของคุณ
           SLIPPAGE: '0.0005'
           MIN_EDGE: '0.005'
