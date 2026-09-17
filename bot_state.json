@@ -7,37 +7,12 @@
   "highest_since_entry": 0.0,
   "entry_time": null,
   "wins": 0,
-  "losses": 2,
-  "consecutive_losses": 2,
+  "losses": 0,
+  "consecutive_losses": 0,
   "consecutive_wins": 0,
-  "risk_factor": 0.6,
+  "risk_factor": 1.0,
   "cooldown_left": 0,
-  "total_pnl": 94656.64,
-  "history": [
-    {
-      "time": "2026-09-16T04:50:49.692518+00:00",
-      "entry": 2518429.0,
-      "exit": 2517006.0,
-      "qty": 0.0,
-      "pnl": 0.0,
-      "pct": -0.657,
-      "gross_pct": -0.057,
-      "fee_pct": 0.6,
-      "reason": "TAKE_PROFIT"
-    },
-    {
-      "time": "2026-09-16T04:58:17.237132+00:00",
-      "entry": 0.0,
-      "exit": 2517006.0,
-      "qty": 0.03772,
-      "pnl": 94656.64,
-      "pct": 0.0,
-      "gross_pct": 0.0,
-      "fee_pct": 0.6,
-      "reason": "TAKE_PROFIT"
-    }
-  ],
-  "last_run": "2026-09-17T05:42:20.861571+00:00",
-  "peak_equity": 194656.64,
-  "dd_pct": 0.0
+  "total_pnl": 0.0,
+  "history": [],
+  "last_run": null
 }
