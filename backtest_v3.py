@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 BASE_URL   = "https://api.binance.th"
 SYMBOL     = "BTCTHB"
-INTERVAL   = "1h"
+INTERVAL   = "4h"
 YEARS_BACK = 5
 
 EMA_FAST, EMA_SLOW = 5, 20
