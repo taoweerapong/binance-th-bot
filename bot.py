@@ -6,6 +6,8 @@ import os, json, time, hmac, hashlib, logging, traceback
 from urllib.parse import urlencode
 from datetime import datetime, timezone
 import requests
+import math
+import time
 
 # ================= CONFIG =================
 API_KEY    = os.getenv("BINANCE_TH_API_KEY", "")
@@ -425,12 +427,12 @@ def main():
                 record_trade(s, entry, price, q, reason)
             else:
                 free = api.balance(info.get("baseAsset", SYMBOL.replace("THB", "")))
-                if free is not None: q = float(f"{min(q, free):.5f}")
-                o = api.market_order(SYMBOL, "SELL", quantity=q)
-                if o:
-                    ex_p = float(o.get("cummulativeQuoteQty", 0)) / float(o.get("executedQty", 1) or 1) or price
-                    log.info("SELL สำเร็จ id=%s @ %.2f", o.get("orderId"), ex_p)
-                    record_trade(s, entry, ex_p, float(o.get("executedQty", q)), reason)
+                if free is not None:
+                    if q <= 0: q = free          # กัน state เพี้ยนเป็น 0
+                    q = math.floor(min(q, free) * 1e5) / 1e5
+                if q <= 0:
+                    log.error("ไม่มี BTC ให้ขาย"); save_state(s); return
+
                 else:
                     log.error("ส่งคำสั่งขายไม่สำเร็จ -> คงสถานะเดิม"); save_state(s); return
             s.update({"in_position": False, "entry_price": 0.0, "position_amount": 0.0,
@@ -500,11 +502,30 @@ def main():
                     o = api.market_order(SYMBOL, "BUY", quantity=qty_est)
                 if not o:
                     log.error("ซื้อไม่สำเร็จ -> ข้ามรอบ"); save_state(s); return
-                got = float(o.get("executedQty", qty_est))
-                spent = float(o.get("cummulativeQuoteQty", cost))
-                entry_p = spent / got if got else price
-                log.info("BUY สำเร็จ id=%s qty=%.8f @ %.2f", o.get("orderId"), got, entry_p)
 
+                base = info.get("baseAsset", SYMBOL.replace("THB", ""))
+                got   = float(o.get("executedQty", 0) or 0)
+                spent = float(o.get("cummulativeQuoteQty", 0) or 0)
+
+                fee = sum(float(f.get("commission", 0) or 0)
+                          for f in (o.get("fills") or [])
+                          if f.get("commissionAsset") == base)
+
+                # response ไม่บอกยอด -> ถามจาก balance จริง
+                if got <= 0:
+                    time.sleep(2)
+                    bal = api.balance(base)
+                    got = float(bal or 0)
+                    fee = 0.0
+                    log.warning("executedQty=0 -> ใช้ balance จริง %.8f", got)
+
+                if got <= 0:
+                    log.error("ซื้อแล้วแต่หายอดไม่เจอ -> ข้ามรอบ"); save_state(s); return
+
+                got = got - fee
+                entry_p = (spent / (got + fee)) if spent > 0 else price
+                log.info("BUY สำเร็จ id=%s qty=%.8f @ %.2f", o.get("orderId"), got, entry_p)
+            
             s.update({"in_position": True, "entry_price": entry_p, "position_amount": got,
                       "stop_loss": entry_p - a * ATR_SL_MULT,
                       "take_profit": entry_p + a * ATR_TP_MULT,
